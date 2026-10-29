@@ -1,0 +1,90 @@
+name: Digest preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_marker:
+        description: Include the lane marker for the initial approved review
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-preview
+  cancel-in-progress: false
+
+jobs:
+  export:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: false
+      - name: Install and check inside Docker
+        run: |
+          docker compose run --rm rig install --frozen-lockfile
+          docker compose run --rm rig test
+          docker compose run --rm rig typecheck
+      - name: Prepare environment
+        env:
+          INCLUDE_MARKER: ${{ inputs.include_marker }}
+          LANE_MARKER: ${{ inputs.include_marker && secrets.LANE_MARKER || '' }}
+        run: |
+          umask 077
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          content = 'LANE_ID=lane-07\nPORT=8787\n'
+          if os.environ['INCLUDE_MARKER'] == 'true':
+              marker = os.environ['LANE_MARKER']
+              if not marker.strip():
+                  raise SystemExit('Marked export requires the LANE_MARKER repository secret.')
+              if '\n' in marker or '\r' in marker:
+                  raise SystemExit('Marker must be a single line.')
+              quote = next((q for q in ("'", '"', '`') if q not in marker), None)
+              if quote is None:
+                  raise SystemExit('Marker cannot contain all three dotenv quote characters.')
+              content += f'LANE_MARKER={quote}{marker}{quote}\n'
+          else:
+              print('Exporting with no marker set.')
+          Path('.env').write_text(content)
+          PY
+      - name: Run and export the sample digest
+        run: |
+          docker compose up --detach rig
+          scripts/export-preview.sh "$RUNNER_TEMP/site/index.html"
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/site
+          retention-days: 1
+      - name: Clean runtime and environment
+        if: always()
+        run: |
+          rm -f .env
+          rm -rf "$RUNNER_TEMP/site"
+          docker compose down --volumes --remove-orphans
+
+  deploy:
+    needs: export
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy the approved preview
+        id: deployment
+        uses: actions/deploy-pages@v4
