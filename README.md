@@ -54,8 +54,8 @@ artifact expiration does not remove the public site.
 
 For the initial approved marked export, set the repository Actions secret
 `LANE_MARKER` and select `include_marker`. A missing secret fails that run.
-Markers must be single-line dotenv values (at least one of the three quote
-characters must be absent). Secret values are never printed. With
+Markers must be single-line dotenv values and omit either a single quote or a
+backtick, so Node preserves literal backslash sequences. Secret values are never printed. With
 `include_marker` unchecked, no marker is passed or written and the banner reads
 "no marker set". After review and separate replacement approval, run that
 marker-free export to replace the page at the same public HTTPS URL, verify it,

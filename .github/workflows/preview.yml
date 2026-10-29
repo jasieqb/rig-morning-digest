@@ -51,9 +51,10 @@ jobs:
                   raise SystemExit('Marked export requires the LANE_MARKER repository secret.')
               if '\n' in marker or '\r' in marker:
                   raise SystemExit('Marker must be a single line.')
-              quote = next((q for q in ("'", '"', '`') if q not in marker), None)
+              # Node decodes backslash escapes inside double quotes; preserve literal values.
+              quote = next((q for q in ("'", '`') if q not in marker), None)
               if quote is None:
-                  raise SystemExit('Marker cannot contain all three dotenv quote characters.')
+                  raise SystemExit('Marker must omit either a single quote or a backtick.')
               content += f'LANE_MARKER={quote}{marker}{quote}\n'
           else:
               print('Exporting with no marker set.')
