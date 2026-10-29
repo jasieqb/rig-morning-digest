@@ -33,6 +33,19 @@ function isEvent(value: unknown): value is RunEvent {
     && (event.error === undefined || event.error === null || typeof event.error === 'string');
 }
 
+function compareInstants(a: string, b: string): number {
+  const milliseconds = Date.parse(a) - Date.parse(b);
+  if (milliseconds !== 0) return milliseconds;
+  // Date.parse truncates after milliseconds; compare the remaining digits exactly.
+  const remainder = (at: string) => (/\.(\d+)/.exec(at)?.[1] ?? '').slice(3);
+  const left = remainder(a);
+  const right = remainder(b);
+  const precision = Math.max(left.length, right.length);
+  const paddedLeft = left.padEnd(precision, '0');
+  const paddedRight = right.padEnd(precision, '0');
+  return paddedLeft < paddedRight ? -1 : paddedLeft > paddedRight ? 1 : 0;
+}
+
 export const readNight: ReadNight = (runsDir, night) => {
   if (!isNight(night)) return null;
   let contents: string;
@@ -59,7 +72,7 @@ export const readNight: ReadNight = (runsDir, night) => {
   }
 
   // Stable sorting keeps file order when two events have the same instant.
-  events.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  events.sort((a, b) => compareInstants(a.at, b.at));
   const jobs = new Map<string, DigestRow>();
   const counts = { ok: 0, retry: 0, fail: 0 };
   for (const event of events) {

@@ -15,6 +15,17 @@ function writeEvents(events: unknown[]) {
 }
 
 describe('readNight', () => {
+  it('orders submillisecond instants without treating them as file-order ties', () => {
+    writeEvents([
+      { at: '2026-10-28T00:00:00.0009Z', job: 'job', owner: 'latest', status: 'ok' },
+      { at: '2026-10-28T01:00:00.0001+01:00', job: 'job', owner: 'earlier', status: 'fail', error: 'earlier error' },
+    ]);
+    expect(read(dir, night)?.rows).toEqual([
+      { job: 'job', owner: 'latest', runs: 2, retries: 0, lastStatus: 'ok', lastError: 'earlier error',
+        firstAt: '2026-10-28T01:00:00.0001+01:00', lastAt: '2026-10-28T00:00:00.0009Z', hasFailure: true },
+    ]);
+  });
+
   it('reads five sorted jobs and one bad line from the real night, counting events', () => {
     expect(read('runs', night)).toEqual({
       night: '2026-10-28', badLines: 1, counts: { ok: 10, retry: 4, fail: 1 },
