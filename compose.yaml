@@ -1,0 +1,16 @@
+services:
+  rig:
+    image: node:24-bookworm-slim
+    working_dir: /app
+    entrypoint: [corepack, pnpm]
+    command: [start]
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - .:/app
+      - dependencies:/app/node_modules
+      - package-manager:/root/.cache/node/corepack
+
+volumes:
+  dependencies:
+  package-manager:
